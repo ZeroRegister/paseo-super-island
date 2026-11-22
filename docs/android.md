@@ -110,6 +110,9 @@ workflows leave diagnostics disabled.
 
 Build the Android fork with the `island` variant to install it alongside Paseo.
 The local notification module can publish without Firebase credentials.
+Island builds inherit the version name and Android version code from the upstream
+Paseo release. To package an update, bring the new upstream release tag into the
+fork and rebuild.
 
 ```bash
 npm ci

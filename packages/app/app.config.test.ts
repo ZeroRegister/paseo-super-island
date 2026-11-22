@@ -1,4 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
+import type { ExpoConfig } from "expo/config";
 import { afterEach, describe, expect, it } from "vitest";
 
 // Load the copies the Expo CLI uses for prebuild, not older hoisted ones.
@@ -14,6 +16,19 @@ interface ManifestEntry {
 }
 
 const originalFdroidFlag = process.env.PASEO_FDROID_BUILD;
+
+function getPublicAppConfig(variant: "production" | "island"): ExpoConfig {
+  const config = execFileSync(
+    process.execPath,
+    [requireFromExpo.resolve("expo/bin/cli"), "config", "--type", "public", "--json"],
+    {
+      cwd: __dirname,
+      encoding: "utf8",
+      env: { ...process.env, APP_VARIANT: variant },
+    },
+  );
+  return JSON.parse(config);
+}
 
 async function resolveAndroidManifest() {
   const { exp } = await getPrebuildConfigAsync(__dirname, { platforms: ["android"] });
@@ -34,6 +49,15 @@ describe("Android app config", () => {
       process.env.PASEO_FDROID_BUILD = originalFdroidFlag;
     }
   });
+
+  it("uses the upstream Paseo version for Island builds", () => {
+    const production = getPublicAppConfig("production");
+    const island = getPublicAppConfig("island");
+    expect(island.android?.package).toBe("sh.paseo.island");
+    expect(island.version).toBe(production.version);
+    expect(production.android?.versionCode).toEqual(expect.any(Number));
+    expect(island.android?.versionCode).toBe(production.android?.versionCode);
+  }, 30_000);
 
   it.each([
     ["Google Play", "0"],
