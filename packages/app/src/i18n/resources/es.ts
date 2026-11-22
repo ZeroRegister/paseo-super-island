@@ -784,10 +784,6 @@ export const es: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "AccionesWorkspace",
-        trackAgent: "Seguir las sesiones activas",
-        stopAgentTracking: "Dejar de seguir las sesiones",
-        agentTrackingPermission:
-          "Permite las notificaciones de Paseo en los ajustes de Android para seguir al agente.",
         workspaceActionsUnhealthy: "Acciones del workspace, hay un servicio con problemas",
         newAgent: "Nuevo agente",
         newTerminal: "Nueva terminal",

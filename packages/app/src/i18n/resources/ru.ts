@@ -785,10 +785,6 @@ export const ru: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "Действия с рабочим пространством",
-        trackAgent: "Отслеживать активные сеансы",
-        stopAgentTracking: "Прекратить отслеживание сеансов",
-        agentTrackingPermission:
-          "Разрешите уведомления Paseo в настройках Android, чтобы отслеживать агента.",
         workspaceActionsUnhealthy: "Действия с рабочим пространством, есть неисправный сервис",
         newAgent: "Новый агент",
         newTerminal: "Новый терминал",

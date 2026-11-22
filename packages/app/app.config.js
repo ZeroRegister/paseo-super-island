@@ -97,7 +97,7 @@ const variants = {
   island: {
     name: "Paseo Island",
     packageId: "sh.paseo.island",
-    androidVersionCodeOffset: 1,
+    androidVersionCodeOffset: 2,
     googleServicesFile: resolveSecretFile({
       envKey: "GOOGLE_SERVICES_FILE_ISLAND",
       fallbackRelativePath: "./.secrets/google-services.island.json",

@@ -1,53 +1,42 @@
-import { PermissionsAndroid, Platform } from "react-native";
-import { create } from "zustand";
+import { AppState } from "react-native";
+import { ensurePushPermission } from "@/push-notifications";
 import { getHostRuntimeStore, isHostRuntimeConnected } from "@/runtime/host-runtime";
 import { useSessionStore, type Agent } from "@/stores/session-store";
-import { summarizeLiveAgents } from "./model";
+import { summarizeLiveAgents, type AgentLiveSummary } from "./model";
 import { agentLiveNotification } from "./native";
 
-const useTracking = create<{ enabled: boolean }>(() => ({ enabled: false }));
-let disposeTracking: (() => void) | null = null;
-let latestRequest = 0;
-
-export const canTrackAgentLive = agentLiveNotification !== null;
-
-export function useIsAgentLiveTrackingEnabled(): boolean {
-  return useTracking((state) => state.enabled);
-}
-
-function stopTracking() {
-  disposeTracking?.();
-  disposeTracking = null;
-  agentLiveNotification?.clear();
-  useTracking.setState({ enabled: false });
-}
-
-async function requestNotificationPermission(): Promise<boolean> {
-  if (Number(Platform.Version) < 33) return true;
-  const permission = PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS;
-  if (await PermissionsAndroid.check(permission)) return true;
-  return (await PermissionsAndroid.request(permission)) === PermissionsAndroid.RESULTS.GRANTED;
-}
-
-export async function toggleAgentLiveTracking(): Promise<"permission" | null> {
+export function startAgentLiveTracking(): () => void {
   const notification = agentLiveNotification;
-  if (!notification) return null;
-  const request = ++latestRequest;
-  if (useTracking.getState().enabled) {
-    stopTracking();
-    return null;
-  }
-
-  const allowed = await requestNotificationPermission();
-  if (request !== latestRequest) return null;
-  if (!allowed) return "permission";
+  if (!notification) return () => undefined;
 
   const host = getHostRuntimeStore();
   const releaseDirectories = new Map<string, () => void>();
   let lastDirectories = new Map<string, ReadonlyMap<string, Agent>>();
-  let lastSummary: string | null = null;
+  let summary: AgentLiveSummary | null = null;
+  let postedSummary: string | null = null;
+  let permission: boolean | undefined;
+  let checkingPermission = false;
   let pending = false;
   let disposed = false;
+
+  const clearNotification = () => {
+    if (postedSummary !== null) notification.clear();
+    postedSummary = null;
+  };
+
+  const checkPermission = async () => {
+    if (checkingPermission) return;
+    checkingPermission = true;
+    const granted = await ensurePushPermission({ requireActiveApp: true }).catch((error) => {
+      console.warn("[AgentLiveNotification] Unable to check notification permission", error);
+      return false;
+    });
+    checkingPermission = false;
+    if (disposed) return;
+    permission = granted;
+    if (!granted) clearNotification();
+    scheduleRefresh();
+  };
 
   const refresh = () => {
     const hostIds = new Set(host.getHosts().map((entry) => entry.serverId));
@@ -70,32 +59,33 @@ export async function toggleAgentLiveTracking(): Promise<"permission" | null> {
         directories.set(serverId, agents);
       }
     }
-    if (
+    const sameDirectories =
       directories.size === lastDirectories.size &&
       Array.from(directories).every(
         ([serverId, agents]) => lastDirectories.get(serverId) === agents,
-      )
-    ) {
-      return true;
+      );
+    if (!sameDirectories) {
+      lastDirectories = directories;
+      summary = summarizeLiveAgents(
+        Array.from(directories, ([serverId, agents]) => ({ serverId, agents: agents.values() })),
+      );
     }
 
-    lastDirectories = directories;
-    const summary = summarizeLiveAgents(
-      Array.from(directories, ([serverId, agents]) => ({ serverId, agents: agents.values() })),
-    );
     if (!summary) {
-      if (lastSummary !== null) notification.clear();
-      lastSummary = null;
-      return true;
+      clearNotification();
+      return;
     }
+    if (permission === undefined) void checkPermission();
+    if (!permission) return;
+
     const key = JSON.stringify(summary);
-    if (key === lastSummary) return true;
+    if (key === postedSummary) return;
     if (!notification.publish(summary.serverId, summary.agentId, summary.titles, summary.total)) {
-      stopTracking();
-      return false;
+      permission = false;
+      clearNotification();
+      return;
     }
-    lastSummary = key;
-    return true;
+    postedSummary = key;
   };
 
   // Host demand can synchronously update both stores. Reconcile once after each batch.
@@ -110,13 +100,19 @@ export async function toggleAgentLiveTracking(): Promise<"permission" | null> {
   const unsubscribeSession = useSessionStore.subscribe(scheduleRefresh);
   const unsubscribeHost = host.subscribeAll(scheduleRefresh);
   const unsubscribeHostList = host.subscribeHostList(scheduleRefresh);
-  disposeTracking = () => {
+  const appState = AppState.addEventListener("change", (state) => {
+    if (state !== "active") return;
+    permission = undefined;
+    scheduleRefresh();
+  });
+  scheduleRefresh();
+  return () => {
     disposed = true;
+    appState.remove();
     unsubscribeSession();
     unsubscribeHost();
     unsubscribeHostList();
     for (const release of releaseDirectories.values()) release();
+    clearNotification();
   };
-  useTracking.setState({ enabled: true });
-  return refresh() ? null : "permission";
 }

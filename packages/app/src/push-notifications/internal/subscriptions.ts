@@ -1,13 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { z } from "zod";
 import { readValidatedString } from "@/storage/validated-storage";
-import type { RevokePushNotificationsInput, StartPushNotificationsInput } from "./types";
+import type {
+  EnsurePushPermissionOptions,
+  RevokePushNotificationsInput,
+  StartPushNotificationsInput,
+} from "./types";
 
 const STORAGE_PREFIX = "@paseo:expo-push-token:";
 const ExpoPushTokenSchema = z.string().trim().min(1);
+let androidPromptInFlight: Promise<boolean> | null = null;
+let androidPromptAttempted = false;
 
 function storageKey(serverId: string): string {
   return `${STORAGE_PREFIX}${serverId}`;
@@ -20,12 +26,34 @@ function getExpoProjectId(): string | null {
   return fromExtra.success ? fromExtra.data : null;
 }
 
-async function ensurePushPermission(): Promise<boolean> {
+async function requestPushPermission(): Promise<boolean> {
+  const requested = await Notifications.requestPermissionsAsync();
+  return requested.status === Notifications.PermissionStatus.GRANTED;
+}
+
+export async function ensurePushPermission({
+  requireActiveApp = false,
+}: EnsurePushPermissionOptions = {}): Promise<boolean> {
   const existing = await Notifications.getPermissionsAsync();
   if (existing.status === Notifications.PermissionStatus.GRANTED) return true;
   if (!existing.canAskAgain) return false;
-  const requested = await Notifications.requestPermissionsAsync();
-  return requested.status === Notifications.PermissionStatus.GRANTED;
+  if (Platform.OS !== "android") return requestPushPermission();
+
+  // Registration and the system card use one permission prompt on Android.
+  if (androidPromptInFlight) return androidPromptInFlight;
+  if (androidPromptAttempted || (requireActiveApp && AppState.currentState !== "active")) {
+    return false;
+  }
+  androidPromptAttempted = true;
+  androidPromptInFlight = requestPushPermission()
+    .catch((error) => {
+      androidPromptAttempted = false;
+      throw error;
+    })
+    .finally(() => {
+      androidPromptInFlight = null;
+    });
+  return androidPromptInFlight;
 }
 
 async function resolveToken(serverId: string): Promise<string | null> {

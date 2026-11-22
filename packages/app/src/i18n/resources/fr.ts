@@ -784,10 +784,6 @@ export const fr: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "Actions de l’espace de travail",
-        trackAgent: "Suivre les sessions actives",
-        stopAgentTracking: "Arrêter de suivre les sessions",
-        agentTrackingPermission:
-          "Autorisez les notifications Paseo dans les paramètres Android pour suivre l’agent.",
         workspaceActionsUnhealthy:
           "Actions de l’espace de travail, un service est en mauvaise santé",
         newAgent: "Nouvel agent",

@@ -773,9 +773,6 @@ export const zhCN: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "Workspace 操作",
-        trackAgent: "跟踪进行中的会话",
-        stopAgentTracking: "停止跟踪会话",
-        agentTrackingPermission: "请在 Android 设置中允许 Paseo 通知。",
         workspaceActionsUnhealthy: "Workspace 操作，有服务异常",
         newAgent: "新建 Agent",
         newTerminal: "新建 Terminal",

@@ -1,6 +1,8 @@
 import { revokeSubscription, startSubscription } from "./internal/subscriptions";
 import type { RevokePushNotificationsInput, StartPushNotificationsInput } from "./internal/types";
 
+export { ensurePushPermission } from "./internal/subscriptions";
+
 export function startPushNotifications(input: StartPushNotificationsInput): () => void {
   return startSubscription(input);
 }

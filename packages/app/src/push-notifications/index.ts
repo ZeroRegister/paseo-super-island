@@ -1,4 +1,14 @@
-import type { RevokePushNotificationsInput, StartPushNotificationsInput } from "./internal/types";
+import type {
+  EnsurePushPermissionOptions,
+  RevokePushNotificationsInput,
+  StartPushNotificationsInput,
+} from "./internal/types";
+
+export async function ensurePushPermission(
+  _options?: EnsurePushPermissionOptions,
+): Promise<boolean> {
+  return false;
+}
 
 export function startPushNotifications(_input: StartPushNotificationsInput): () => void {
   return () => undefined;
