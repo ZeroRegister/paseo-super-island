@@ -106,6 +106,40 @@ personal dogfooding. Android system-trace spans require the separate `PASEO_PROF
 watchdog recording does not send duplicate spans to that sink by default. Normal store/release
 workflows leave diagnostics disabled.
 
+### Paseo Island test APK
+
+Build the Android fork with the `island` variant to install it alongside Paseo.
+The local notification module can publish without Firebase credentials.
+
+```bash
+npm ci
+npm run build:app-deps
+cd packages/app
+export APP_VARIANT=island
+npx expo prebuild --platform android --clean --no-install
+cd android
+./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a
+```
+
+Install `app/build/outputs/apk/release/app-release.apk` and pair it with your
+existing host. In a running agent conversation, open the workspace **⋯** menu
+and choose **Track agent outside Paseo**. Open another app, then check that
+the same notification follows the run from working to waiting for input and
+clears when the run ends. Tap it to verify it opens the tracked conversation.
+You can stop tracking from the same menu.
+
+For Xiaomi testing, set `PASEO_XIAOMI_ISLAND_APP_ID` to the Xiaomi developer
+App ID for `sh.paseo.island` before prebuild. Set
+`PASEO_XIAOMI_ISLAND_DEBUG=1` when using the debug certificate registered for
+testing. The generated local APK uses that debug signing configuration.
+Register the signing fingerprint and test device through the Xiaomi developer
+portal. The notification falls back to Android Live Updates or the notification
+shade when the system does not grant Super Island presentation.
+[Xiaomi integration guide](https://dev.mi.com/xiaomihyperos/documentation/detail?pId=2132)
+
+Updates are driven by the existing connection to the Paseo host. If Android
+stops the app process, updates pause and the card expires automatically.
+
 The older `android`, `android:development`, and `ios` commands remain aliases for development.
 `android:production` still builds and installs a release through Expo; use `build:apk` when you
 need an artifact. `android:clear` removes the generated Android project.

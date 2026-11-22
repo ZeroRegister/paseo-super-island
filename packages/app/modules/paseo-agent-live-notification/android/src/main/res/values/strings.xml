@@ -1,0 +1,10 @@
+<resources>
+  <string name="paseo_agent_live_channel">Live agent status</string>
+  <string name="paseo_agent_live_running">Agent working</string>
+  <string name="paseo_agent_live_running_short">Working</string>
+  <string name="paseo_agent_live_waiting">Agent needs your input</string>
+  <string name="paseo_agent_live_waiting_short">Input</string>
+  <string name="paseo_agent_live_reconnecting">Reconnecting to agent</string>
+  <string name="paseo_agent_live_reconnecting_short">Syncing</string>
+  <string name="paseo_agent_live_open">Open session</string>
+</resources>

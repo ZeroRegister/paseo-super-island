@@ -3403,6 +3403,7 @@ function WorkspaceScreenContent({
   const renderCompactWorkspaceHeader = useCallback(
     (paneTabs: WorkspaceCompactHeaderTabs | null, actionsOnly = false) => {
       const tabSwitcher = paneTabs ? renderWorkspaceTabSwitcher(paneTabs) : null;
+      const activeTarget = paneTabs?.tabs.find((tab) => tab.key === paneTabs.activeTabKey)?.target;
       return (
         <CompactWorkspaceHeader
           headerVariant={actionsOnly ? "full" : "compact"}
@@ -3419,6 +3420,7 @@ function WorkspaceScreenContent({
         >
           <WorkspaceHeaderMenuMobile
             pane={paneTabs?.actions.pane}
+            activeAgentId={activeTarget?.kind === "agent" ? activeTarget.agentId : undefined}
             onExitFocusMode={isFocusModeEnabled ? toggleFocusMode : undefined}
             normalizedServerId={normalizedServerId}
             normalizedWorkspaceId={normalizedWorkspaceId}

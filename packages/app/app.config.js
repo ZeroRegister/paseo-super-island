@@ -8,6 +8,7 @@ const withFdroidAutolinking = require("./plugins/with-fdroid-autolinking");
 const withPasteInput = require("./plugins/with-paste-input");
 const withAndroidScroll = require("./modules/paseo-scroll/app.plugin");
 const withAndroidDisplayMetrics = require("./modules/paseo-display-metrics/app.plugin");
+const withXiaomiIslandAppId = require("./modules/paseo-agent-live-notification/app.plugin");
 const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
@@ -93,6 +94,14 @@ const variants = {
       fallbackRelativePath: "./.secrets/GoogleService-Info.debug.plist",
     }),
   },
+  island: {
+    name: "Paseo Island",
+    packageId: "sh.paseo.island",
+    googleServicesFile: resolveSecretFile({
+      envKey: "GOOGLE_SERVICES_FILE_ISLAND",
+      fallbackRelativePath: "./.secrets/google-services.island.json",
+    }),
+  },
 };
 
 const variant = variants[appVariant] ?? variants.production;
@@ -148,6 +157,13 @@ export default {
       withPasteInput,
       withAndroidScroll,
       withAndroidDisplayMetrics,
+      [
+        withXiaomiIslandAppId,
+        {
+          appId: process.env.PASEO_XIAOMI_ISLAND_APP_ID?.trim(),
+          debug: process.env.PASEO_XIAOMI_ISLAND_DEBUG === "1",
+        },
+      ],
       [withAndroidAsyncStorageSize, 64],
       ...buildProfile.cameraPlugins,
       withAndroidOptionalCamera,

@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import { agentLiveNotification } from "@/agent-live-notification/native";
 import type { NotificationOpenSource, NotificationTap } from "./source";
 
 function toTap(response: Notifications.NotificationResponse): NotificationTap {
@@ -23,14 +24,27 @@ export function createNotificationOpenSource(): NotificationOpenSource {
       const subscription = Notifications.addNotificationResponseReceivedListener((response) =>
         onTap(toTap(response)),
       );
-      return () => subscription.remove();
+      const liveSubscription = agentLiveNotification?.addListener(
+        "onAgentLiveNotificationTap",
+        onTap,
+      );
+      return () => {
+        subscription.remove();
+        liveSubscription?.remove();
+      };
     },
     async takeLaunchTap() {
+      const liveTap = agentLiveNotification?.takeLaunchTap();
+      if (liveTap) return liveTap;
       const response = await Notifications.getLastNotificationResponseAsync();
       return response ? toTap(response) : null;
     },
-    acknowledge() {
-      Notifications.clearLastNotificationResponse();
+    acknowledge(tap) {
+      if (tap.id.startsWith("agent-live:")) {
+        agentLiveNotification?.acknowledgeTap(tap.id);
+      } else {
+        Notifications.clearLastNotificationResponse();
+      }
     },
   };
 }

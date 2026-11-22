@@ -3,7 +3,14 @@ import React, { useCallback, useMemo } from "react";
 import { View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Copy, Ellipsis, Globe, Import as ImportIcon, Settings } from "lucide-react-native";
+import {
+  Activity,
+  Copy,
+  Ellipsis,
+  Globe,
+  Import as ImportIcon,
+  Settings,
+} from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import {
@@ -33,12 +40,19 @@ import {
   type UseWorkspaceScriptsMenuPagesInput,
 } from "@/screens/workspace/scripts";
 import { usePluginWorkspaceMenu } from "@/plugins";
+import {
+  canTrackAgentLive,
+  toggleAgentLiveTracking,
+  useIsAgentLiveTracked,
+} from "@/agent-live-notification";
+import { useToast } from "@/contexts/toast-api-context";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedGlobe = withUnistyles(Globe);
 const ThemedImport = withUnistyles(ImportIcon);
 const ThemedSettings = withUnistyles(Settings);
+const ThemedActivity = withUnistyles(Activity);
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
@@ -46,6 +60,7 @@ const MENU_NEW_BROWSER_ICON = <ThemedGlobe size={16} uniProps={mutedColorMapping
 const MENU_IMPORT_ICON = <ThemedImport size={16} uniProps={mutedColorMapping} />;
 const MENU_COPY_ICON = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
 const MENU_SETTINGS_ICON = <ThemedSettings size={16} uniProps={mutedColorMapping} />;
+const MENU_TRACK_AGENT_ICON = <ThemedActivity size={16} uniProps={mutedColorMapping} />;
 function WorkspaceHeaderMenuTriggerIcon() {
   return (
     <ThemedEllipsis
@@ -208,6 +223,7 @@ function HeaderMenuProfileItem({
 
 export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspaceActions {
   pane?: WorkspaceCompactHeaderActions["pane"];
+  activeAgentId?: string;
   onExitFocusMode?: () => void;
   normalizedServerId: string;
   normalizedWorkspaceId: string;
@@ -235,6 +251,7 @@ export function WorkspaceHeaderMenuMobile({
   onCreateTerminalWithProfile,
   onCreateBrowser,
   pane,
+  activeAgentId,
   onExitFocusMode,
   ...workspaceActions
 }: WorkspaceHeaderMenuMobileProps) {
@@ -316,6 +333,9 @@ export function WorkspaceHeaderMenuMobile({
             )}
           </DropdownMenuItem>
         ) : null}
+        {canTrackAgentLive && activeAgentId ? (
+          <TrackAgentLiveMenuItem serverId={normalizedServerId} agentId={activeAgentId} />
+        ) : null}
         {scriptsMenu.trigger}
         {pluginMenu.rows}
         {pluginMenu.rows.length > 0 ? <DropdownMenuSeparator /> : null}
@@ -348,6 +368,38 @@ export function WorkspaceHeaderMenuMobile({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function TrackAgentLiveMenuItem({ serverId, agentId }: { serverId: string; agentId: string }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const tracked = useIsAgentLiveTracked({ serverId, agentId });
+  const toggleTracking = useCallback(async () => {
+    try {
+      const error = await toggleAgentLiveTracking({ serverId, agentId });
+      if (error === "permission") {
+        toast.error(t("workspace.header.actions.agentTrackingPermission"));
+      } else if (error === "inactive") {
+        toast.error(t("workspace.header.actions.agentTrackingInactive"));
+      }
+    } catch (error) {
+      console.warn("[AgentLiveNotification] Unable to change tracking", error);
+      toast.error(t("workspace.header.actions.agentTrackingPermission"));
+    }
+  }, [agentId, serverId, t, toast]);
+  return (
+    <DropdownMenuItem
+      testID="workspace-header-track-agent"
+      leading={MENU_TRACK_AGENT_ICON}
+      onSelect={toggleTracking}
+    >
+      {t(
+        tracked
+          ? "workspace.header.actions.stopAgentTracking"
+          : "workspace.header.actions.trackAgent",
+      )}
+    </DropdownMenuItem>
   );
 }
 

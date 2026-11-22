@@ -1,0 +1,10 @@
+<resources>
+  <string name="paseo_agent_live_channel">Agent 实时状态</string>
+  <string name="paseo_agent_live_running">Agent 正在运行</string>
+  <string name="paseo_agent_live_running_short">运行中</string>
+  <string name="paseo_agent_live_waiting">Agent 等待你确认</string>
+  <string name="paseo_agent_live_waiting_short">待确认</string>
+  <string name="paseo_agent_live_reconnecting">正在重新连接 Agent</string>
+  <string name="paseo_agent_live_reconnecting_short">重连中</string>
+  <string name="paseo_agent_live_open">打开会话</string>
+</resources>
