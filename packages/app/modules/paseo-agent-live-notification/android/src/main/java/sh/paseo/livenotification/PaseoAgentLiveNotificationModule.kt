@@ -9,6 +9,9 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.text.TextPaint
+import android.text.TextUtils
+import android.util.TypedValue
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.util.UUID
@@ -19,6 +22,9 @@ private const val NOTIFICATION_ID = 0x50415345
 private const val TAP_EVENT = "onAgentLiveNotificationTap"
 private const val SERVER_ID = "sh.paseo.livenotification.SERVER_ID"
 private const val AGENT_ID = "sh.paseo.livenotification.AGENT_ID"
+private const val CARD_MAX_WIDTH_DP = 360
+private const val CARD_GUTTERS_AND_ICON_DP = 120
+private const val CARD_TEXT_SIZE_SP = 16f
 
 class PaseoAgentLiveNotificationModule : Module() {
   private val pendingTap = AtomicReference<Bundle?>()
@@ -102,8 +108,7 @@ class PaseoAgentLiveNotificationModule : Module() {
       .takeIf { it != 0 } ?: context.applicationInfo.icon
     val headline = context.resources.getQuantityString(R.plurals.paseo_agent_live_count, total, total)
     val shortText = if (total > 99) "99+" else total.toString()
-    val missingTitle = context.getString(R.string.paseo_agent_live_untitled)
-    val rows = titles.map { it.ifBlank { missingTitle } }
+    val rows = formatTaskRows(context, titles)
     val overflow = total - rows.size
     val body = buildList {
       addAll(rows)
@@ -148,6 +153,25 @@ class PaseoAgentLiveNotificationModule : Module() {
     } catch (_: SecurityException) {
       // Notification permission can be revoked between the check and post.
       false
+    }
+  }
+
+  private fun formatTaskRows(context: Context, titles: List<String>): List<String> {
+    // BigTextStyle keeps the card eligible for Live Updates. Measure each line with
+    // a conservative allowance for the system template's icon and padding.
+    val resources = context.resources
+    val metrics = resources.displayMetrics
+    val cardWidthDp = minOf(resources.configuration.screenWidthDp, CARD_MAX_WIDTH_DP)
+    val textWidthDp = (cardWidthDp - CARD_GUTTERS_AND_ICON_DP).coerceAtLeast(1).toFloat()
+    val textWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, textWidthDp, metrics)
+    val paint = TextPaint().apply {
+      textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, CARD_TEXT_SIZE_SP, metrics)
+      textLocales = resources.configuration.locales
+    }
+    val missingTitle = context.getString(R.string.paseo_agent_live_untitled)
+    return titles.map { title ->
+      TextUtils.ellipsize(title.ifBlank { missingTitle }, paint, textWidth, TextUtils.TruncateAt.END)
+        .toString().ifEmpty { "…" }
     }
   }
 

@@ -1,10 +1,13 @@
 import type { AppStateStatus } from "react-native";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { LiveAgent } from "./model";
+import type { LiveAgent, LiveWorkspace } from "./model";
 import { startAgentLiveTracking } from "./index";
 
 const fake = vi.hoisted(() => ({
-  sessions: {} as Record<string, { agents: Map<string, LiveAgent> }>,
+  sessions: {} as Record<
+    string,
+    { agents: Map<string, LiveAgent>; workspaces: Map<string, LiveWorkspace> }
+  >,
   listeners: new Set<() => void>(),
   appStateListeners: new Set<(state: AppStateStatus) => void>(),
   connected: new Set<string>(),
@@ -79,7 +82,7 @@ function setSessions(serverId: string, ids: number[], status: LiveAgent["status"
         String(id),
         {
           id: String(id),
-          title: `Task ${id}`,
+          workspaceId: String(id),
           status,
           turn: { phase: "idle", cancellationRequestId: null },
           pendingPermissions: [],
@@ -88,6 +91,7 @@ function setSessions(serverId: string, ids: number[], status: LiveAgent["status"
         },
       ]),
     ),
+    workspaces: new Map(ids.map((id) => [String(id), { id: String(id), name: `Task ${id}` }])),
   };
 }
 
@@ -153,4 +157,20 @@ it("automatically shows existing runs after notification access is granted on re
   await vi.waitFor(() =>
     expect(fake.publish).toHaveBeenCalledExactlyOnceWith("mac", "2", ["Task 2", "Task 1"], 2),
   );
+});
+
+it("refreshes an active notification when its workspace name arrives or changes", async () => {
+  setSessions("mac", [1]);
+  const session = fake.sessions.mac;
+  session.workspaces = new Map();
+  stopTracking = startAgentLiveTracking();
+  await vi.waitFor(() => expect(fake.publish).toHaveBeenCalledExactlyOnceWith("mac", "1", [""], 1));
+
+  session.workspaces = new Map([["1", { id: "1", name: "检查文件导出" }]]);
+  await emit();
+  expect(fake.publish).toHaveBeenNthCalledWith(2, "mac", "1", ["检查文件导出"], 1);
+
+  session.workspaces = new Map([["1", { id: "1", name: "检查 CSV 文件导出进度" }]]);
+  await emit();
+  expect(fake.publish).toHaveBeenNthCalledWith(3, "mac", "1", ["检查 CSV 文件导出进度"], 1);
 });

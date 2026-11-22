@@ -1,9 +1,11 @@
 import { AppState } from "react-native";
 import { ensurePushPermission } from "@/push-notifications";
 import { getHostRuntimeStore, isHostRuntimeConnected } from "@/runtime/host-runtime";
-import { useSessionStore, type Agent } from "@/stores/session-store";
+import { useSessionStore, type SessionState } from "@/stores/session-store";
 import { summarizeLiveAgents, type AgentLiveSummary } from "./model";
 import { agentLiveNotification } from "./native";
+
+type LiveDirectory = Pick<SessionState, "agents" | "workspaces">;
 
 export function startAgentLiveTracking(): () => void {
   const notification = agentLiveNotification;
@@ -11,7 +13,7 @@ export function startAgentLiveTracking(): () => void {
 
   const host = getHostRuntimeStore();
   const releaseDirectories = new Map<string, () => void>();
-  let lastDirectories = new Map<string, ReadonlyMap<string, Agent>>();
+  let lastDirectories = new Map<string, LiveDirectory>();
   let summary: AgentLiveSummary | null = null;
   let postedSummary: string | null = null;
   let permission: boolean | undefined;
@@ -51,23 +53,28 @@ export function startAgentLiveTracking(): () => void {
       }
     }
 
-    const directories = new Map<string, ReadonlyMap<string, Agent>>();
+    const directories = new Map<string, LiveDirectory>();
     const { sessions } = useSessionStore.getState();
     for (const serverId of hostIds) {
-      const agents = sessions[serverId]?.agents;
-      if (agents && isHostRuntimeConnected(host.getSnapshot(serverId))) {
-        directories.set(serverId, agents);
+      const session = sessions[serverId];
+      if (session && isHostRuntimeConnected(host.getSnapshot(serverId))) {
+        directories.set(serverId, { agents: session.agents, workspaces: session.workspaces });
       }
     }
     const sameDirectories =
       directories.size === lastDirectories.size &&
-      Array.from(directories).every(
-        ([serverId, agents]) => lastDirectories.get(serverId) === agents,
-      );
+      Array.from(directories).every(([serverId, { agents, workspaces }]) => {
+        const previous = lastDirectories.get(serverId);
+        return previous?.agents === agents && previous.workspaces === workspaces;
+      });
     if (!sameDirectories) {
       lastDirectories = directories;
       summary = summarizeLiveAgents(
-        Array.from(directories, ([serverId, agents]) => ({ serverId, agents: agents.values() })),
+        Array.from(directories, ([serverId, { agents, workspaces }]) => ({
+          serverId,
+          agents: agents.values(),
+          workspaces,
+        })),
       );
     }
 

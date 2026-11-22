@@ -127,9 +127,11 @@ cd android
 Install `app/build/outputs/apk/release/app-release.apk` and pair it with your
 existing host. Allow Android notifications. The summary appears automatically
 when a connected host has an active session. Run four sessions and expand the
-notification to check for a total of four, three titles, and `+1`. Finish a
-visible run and confirm its title disappears. Tap **Open session** to open the
-newest active session. The card clears when there are no active sessions.
+notification to check for a total of four, three workspace names, and `+1`.
+Each name is shortened to one line. Rename a running session's workspace and
+check that the new name appears. Finish a visible run and confirm its name
+disappears. Tap **Open session** to open the newest active session. The card
+clears when there are no active sessions.
 
 For Xiaomi testing, set `PASEO_XIAOMI_ISLAND_APP_ID` to the Xiaomi developer
 App ID for `sh.paseo.island` before prebuild. Set

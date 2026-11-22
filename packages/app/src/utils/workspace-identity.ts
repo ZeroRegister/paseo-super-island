@@ -31,7 +31,7 @@ export function resolveWorkspaceRouteId(input: {
 }
 
 export function resolveWorkspaceMapKeyByIdentity(input: {
-  workspaces: Map<string, WorkspaceDescriptor> | null | undefined;
+  workspaces: ReadonlyMap<string, Pick<WorkspaceDescriptor, "id">> | null | undefined;
   workspaceId: string | null | undefined;
 }): string | null {
   const normalizedWorkspaceId = normalizeWorkspaceOpaqueId(input.workspaceId);

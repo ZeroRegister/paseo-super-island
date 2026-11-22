@@ -1,12 +1,12 @@
-import type { Agent } from "@/stores/session-store";
+import type { Agent, WorkspaceDescriptor } from "@/stores/session-store";
+import { resolveWorkspaceMapKeyByIdentity } from "@/utils/workspace-identity";
 
 const VISIBLE_SESSIONS = 3;
-const MAX_TITLE_LENGTH = 36;
 
 export type LiveAgent = Pick<
   Agent,
   | "id"
-  | "title"
+  | "workspaceId"
   | "status"
   | "archivedAt"
   | "background"
@@ -16,9 +16,12 @@ export type LiveAgent = Pick<
   | "createdAt"
 >;
 
+export type LiveWorkspace = Pick<WorkspaceDescriptor, "id" | "name">;
+
 interface LiveHost {
   serverId: string;
   agents: Iterable<LiveAgent>;
+  workspaces: ReadonlyMap<string, LiveWorkspace>;
 }
 
 export interface AgentLiveSummary {
@@ -49,17 +52,11 @@ function startedAt(agent: LiveAgent): number {
   return (turnStart ?? agent.lastUserMessageAt ?? agent.createdAt).getTime();
 }
 
-function formatSessionTitle(title: string | null): string {
-  const characters = Array.from(title?.replace(/\s+/gu, " ").trim() ?? "");
-  if (characters.length <= MAX_TITLE_LENGTH) return characters.join("");
-  return `${characters.slice(0, MAX_TITLE_LENGTH - 1).join("")}…`;
-}
-
 export function summarizeLiveAgents(hosts: Iterable<LiveHost>): AgentLiveSummary | null {
   const active = [];
-  for (const { serverId, agents } of hosts) {
+  for (const { serverId, agents, workspaces } of hosts) {
     for (const agent of agents) {
-      if (isActiveSession(agent)) active.push({ serverId, agent });
+      if (isActiveSession(agent)) active.push({ serverId, agent, workspaces });
     }
   }
   active.sort(
@@ -73,7 +70,11 @@ export function summarizeLiveAgents(hosts: Iterable<LiveHost>): AgentLiveSummary
   return {
     serverId: first.serverId,
     agentId: first.agent.id,
-    titles: active.slice(0, VISIBLE_SESSIONS).map(({ agent }) => formatSessionTitle(agent.title)),
+    titles: active.slice(0, VISIBLE_SESSIONS).map(({ agent, workspaces }) => {
+      const key = resolveWorkspaceMapKeyByIdentity({ workspaces, workspaceId: agent.workspaceId });
+      const workspace = key ? workspaces.get(key) : undefined;
+      return workspace?.name.replace(/[\s\u0085]+/gu, " ").trim() ?? "";
+    }),
     total: active.length,
   };
 }
