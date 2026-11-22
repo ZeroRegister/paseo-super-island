@@ -774,10 +774,9 @@ export const en = {
     header: {
       actions: {
         workspaceActions: "Workspace actions",
-        trackAgent: "Track agent outside Paseo",
-        stopAgentTracking: "Stop tracking agent",
+        trackAgent: "Track active sessions",
+        stopAgentTracking: "Stop tracking sessions",
         agentTrackingPermission: "Allow Paseo notifications in Android settings to track an agent.",
-        agentTrackingInactive: "Start an agent run before tracking it.",
         workspaceActionsUnhealthy: "Workspace actions, a service is unhealthy",
         newAgent: "New agent",
         newTerminal: "New terminal",

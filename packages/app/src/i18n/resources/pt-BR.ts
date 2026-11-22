@@ -781,11 +781,10 @@ export const ptBR: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "Ações do workspace",
-        trackAgent: "Acompanhar o agente fora do Paseo",
-        stopAgentTracking: "Parar de acompanhar o agente",
+        trackAgent: "Acompanhar sessões ativas",
+        stopAgentTracking: "Parar de acompanhar sessões",
         agentTrackingPermission:
           "Permita notificações do Paseo nas configurações do Android para acompanhar o agente.",
-        agentTrackingInactive: "Inicie uma tarefa do agente antes de acompanhá-la.",
         workspaceActionsUnhealthy: "Ações do workspace, há um serviço com problema",
         newAgent: "Novo agente",
         newTerminal: "Novo terminal",

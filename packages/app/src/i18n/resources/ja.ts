@@ -781,11 +781,10 @@ export const ja: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "ワークスペースアクション",
-        trackAgent: "Paseo の外でエージェントを追跡",
-        stopAgentTracking: "エージェントの追跡を停止",
+        trackAgent: "実行中のセッションを追跡",
+        stopAgentTracking: "セッションの追跡を停止",
         agentTrackingPermission:
           "エージェントを追跡するには、Android の設定で Paseo の通知を許可してください。",
-        agentTrackingInactive: "追跡する前にエージェントのタスクを開始してください。",
         workspaceActionsUnhealthy: "ワークスペースアクション、異常なサービスがあります",
         newAgent: "新しいエージェント",
         newTerminal: "新しいターミナル",

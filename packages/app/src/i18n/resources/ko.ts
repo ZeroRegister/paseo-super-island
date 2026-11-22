@@ -777,10 +777,9 @@ export const ko: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "워크스페이스 작업",
-        trackAgent: "Paseo 밖에서 에이전트 추적",
-        stopAgentTracking: "에이전트 추적 중지",
+        trackAgent: "진행 중인 세션 추적",
+        stopAgentTracking: "세션 추적 중지",
         agentTrackingPermission: "에이전트를 추적하려면 Android 설정에서 Paseo 알림을 허용하세요.",
-        agentTrackingInactive: "추적하기 전에 에이전트 작업을 시작하세요.",
         workspaceActionsUnhealthy: "워크스페이스 작업, 비정상 서비스가 있습니다",
         newAgent: "새 에이전트",
         newTerminal: "새 터미널",

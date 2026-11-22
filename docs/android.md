@@ -122,11 +122,11 @@ cd android
 ```
 
 Install `app/build/outputs/apk/release/app-release.apk` and pair it with your
-existing host. In a running agent conversation, open the workspace **⋯** menu
-and choose **Track agent outside Paseo**. Open another app, then check that
-the same notification follows the run from working to waiting for input and
-clears when the run ends. Tap it to verify it opens the tracked conversation.
-You can stop tracking from the same menu.
+existing host. Choose **Track active sessions** from the workspace **⋯** menu.
+Run four sessions and expand the notification to check for a total of four,
+three titles, and `+1`. Finish a visible run and confirm its title disappears.
+Tap **Open session** to open the newest active session. The card clears when
+there are no active sessions. To turn tracking off, use the same workspace menu.
 
 For Xiaomi testing, set `PASEO_XIAOMI_ISLAND_APP_ID` to the Xiaomi developer
 App ID for `sh.paseo.island` before prebuild. Set

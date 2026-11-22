@@ -1,11 +1,11 @@
 import { expect, it, vi } from "vitest";
-import type { Agent } from "@/stores/session-store";
+import type { LiveAgent } from "./model";
 import { toggleAgentLiveTracking } from "./index";
 
 const fake = vi.hoisted(() => ({
-  agents: new Map<string, Pick<Agent, "status" | "pendingPermissions">>(),
-  connected: true,
+  sessions: {} as Record<string, { agents: Map<string, LiveAgent> }>,
   listeners: new Set<() => void>(),
+  connected: new Set(["mac", "server"]),
   publish: vi.fn(() => true),
   clear: vi.fn(),
   releaseDirectory: vi.fn(),
@@ -21,20 +21,19 @@ vi.mock("react-native", () => ({
 
 vi.mock("@/runtime/host-runtime", () => ({
   getHostRuntimeStore: () => ({
-    getSnapshot: () => fake.connected,
-    subscribe: (serverId: string, callback: () => void) => {
-      expect(serverId).toBe("host");
-      return subscribe(callback);
-    },
-    acquireDirectoryDemand: () => fake.releaseDirectory,
+    getHosts: () => Object.keys(fake.sessions).map((serverId) => ({ serverId })),
+    getSnapshot: (serverId: string) => fake.connected.has(serverId),
+    subscribeAll: subscribe,
+    subscribeHostList: subscribe,
+    acquireDirectoryDemand: (serverId: string) => () => fake.releaseDirectory(serverId),
   }),
   isHostRuntimeConnected: (snapshot: boolean) => snapshot,
 }));
 
 vi.mock("@/stores/session-store", () => ({
   useSessionStore: {
-    getState: () => ({ sessions: { host: { agents: fake.agents } } }),
-    subscribe: (callback: () => void) => subscribe(callback),
+    getState: () => ({ sessions: fake.sessions }),
+    subscribe,
   },
 }));
 
@@ -48,32 +47,62 @@ function subscribe(callback: () => void) {
   return () => fake.listeners.delete(listener);
 }
 
-function emit() {
+async function emit() {
   for (const listener of fake.listeners) listener();
+  await Promise.resolve();
 }
 
-it("updates one notification through a run and releases the directory when it ends", async () => {
-  const target = { serverId: "host", agentId: "agent" };
-  fake.agents.set("agent", { status: "running", pendingPermissions: [] });
-  expect(await toggleAgentLiveTracking(target)).toBeNull();
-  emit();
-  expect(fake.publish).toHaveBeenCalledExactlyOnceWith("host", "agent", "running");
+function setSessions(serverId: string, ids: number[], status: LiveAgent["status"] = "running") {
+  fake.sessions[serverId] = {
+    agents: new Map(
+      ids.map((id) => [
+        String(id),
+        {
+          id: String(id),
+          title: `Task ${id}`,
+          status,
+          turn: { phase: "idle", cancellationRequestId: null },
+          pendingPermissions: [],
+          lastUserMessageAt: new Date(id),
+          createdAt: new Date(0),
+        },
+      ]),
+    ),
+  };
+}
 
-  fake.agents.set("agent", {
-    status: "running",
-    pendingPermissions: [{ id: "approval", provider: "codex", kind: "tool", name: "shell" }],
-  });
-  emit();
-  expect(fake.publish).toHaveBeenLastCalledWith("host", "agent", "waiting");
+it("keeps one summary, promotes the next session on completion, and starts a new card after zero", async () => {
+  setSessions("mac", [1, 2, 3]);
+  setSessions("server", [4]);
+  expect(await toggleAgentLiveTracking()).toBeNull();
+  await emit();
+  expect(fake.publish).toHaveBeenCalledExactlyOnceWith(
+    "server",
+    "4",
+    ["Task 4", "Task 3", "Task 2"],
+    4,
+  );
 
-  fake.connected = false;
-  emit();
-  expect(fake.publish).toHaveBeenLastCalledWith("host", "agent", "reconnecting");
+  setSessions("server", [4], "idle");
+  await emit();
+  expect(fake.publish).toHaveBeenLastCalledWith("mac", "3", ["Task 3", "Task 2", "Task 1"], 3);
 
-  fake.connected = true;
-  fake.agents.set("agent", { status: "idle", pendingPermissions: [] });
-  emit();
+  fake.connected.delete("mac");
+  await emit();
   expect(fake.clear).toHaveBeenCalledOnce();
-  expect(fake.releaseDirectory).toHaveBeenCalledOnce();
+
+  setSessions("mac", [], "idle");
+  fake.connected.add("mac");
+  await emit();
+  expect(fake.clear).toHaveBeenCalledOnce();
+  expect(fake.publish).toHaveBeenCalledTimes(2);
+
+  setSessions("mac", [5]);
+  await emit();
+  expect(fake.publish).toHaveBeenLastCalledWith("mac", "5", ["Task 5"], 1);
+
+  expect(await toggleAgentLiveTracking()).toBeNull();
+  expect(fake.clear).toHaveBeenCalledTimes(2);
+  expect(fake.releaseDirectory.mock.calls.flat()).toEqual(["mac", "server"]);
   expect(fake.listeners.size).toBe(0);
 });

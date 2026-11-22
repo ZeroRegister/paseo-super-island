@@ -777,10 +777,9 @@ export const ar: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "إجراءات Workspace",
-        trackAgent: "تتبّع الوكيل خارج Paseo",
-        stopAgentTracking: "إيقاف تتبّع الوكيل",
+        trackAgent: "تتبّع الجلسات الجارية",
+        stopAgentTracking: "إيقاف تتبّع الجلسات",
         agentTrackingPermission: "اسمح بإشعارات Paseo في إعدادات Android لتتبّع الوكيل.",
-        agentTrackingInactive: "ابدأ تشغيل الوكيل قبل تتبّعه.",
         workspaceActionsUnhealthy: "إجراءات Workspace، توجد خدمة غير سليمة",
         newAgent: "وكيل جديد",
         newTerminal: "محطة جديدة",

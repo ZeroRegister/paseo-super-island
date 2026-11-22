@@ -43,7 +43,7 @@ import { usePluginWorkspaceMenu } from "@/plugins";
 import {
   canTrackAgentLive,
   toggleAgentLiveTracking,
-  useIsAgentLiveTracked,
+  useIsAgentLiveTrackingEnabled,
 } from "@/agent-live-notification";
 import { useToast } from "@/contexts/toast-api-context";
 
@@ -223,7 +223,6 @@ function HeaderMenuProfileItem({
 
 export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspaceActions {
   pane?: WorkspaceCompactHeaderActions["pane"];
-  activeAgentId?: string;
   onExitFocusMode?: () => void;
   normalizedServerId: string;
   normalizedWorkspaceId: string;
@@ -251,7 +250,6 @@ export function WorkspaceHeaderMenuMobile({
   onCreateTerminalWithProfile,
   onCreateBrowser,
   pane,
-  activeAgentId,
   onExitFocusMode,
   ...workspaceActions
 }: WorkspaceHeaderMenuMobileProps) {
@@ -333,9 +331,7 @@ export function WorkspaceHeaderMenuMobile({
             )}
           </DropdownMenuItem>
         ) : null}
-        {canTrackAgentLive && activeAgentId ? (
-          <TrackAgentLiveMenuItem serverId={normalizedServerId} agentId={activeAgentId} />
-        ) : null}
+        {canTrackAgentLive ? <TrackAgentLiveMenuItem /> : null}
         {scriptsMenu.trigger}
         {pluginMenu.rows}
         {pluginMenu.rows.length > 0 ? <DropdownMenuSeparator /> : null}
@@ -371,23 +367,21 @@ export function WorkspaceHeaderMenuMobile({
   );
 }
 
-function TrackAgentLiveMenuItem({ serverId, agentId }: { serverId: string; agentId: string }) {
+function TrackAgentLiveMenuItem() {
   const { t } = useTranslation();
   const toast = useToast();
-  const tracked = useIsAgentLiveTracked({ serverId, agentId });
+  const tracked = useIsAgentLiveTrackingEnabled();
   const toggleTracking = useCallback(async () => {
     try {
-      const error = await toggleAgentLiveTracking({ serverId, agentId });
+      const error = await toggleAgentLiveTracking();
       if (error === "permission") {
         toast.error(t("workspace.header.actions.agentTrackingPermission"));
-      } else if (error === "inactive") {
-        toast.error(t("workspace.header.actions.agentTrackingInactive"));
       }
     } catch (error) {
       console.warn("[AgentLiveNotification] Unable to change tracking", error);
       toast.error(t("workspace.header.actions.agentTrackingPermission"));
     }
-  }, [agentId, serverId, t, toast]);
+  }, [t, toast]);
   return (
     <DropdownMenuItem
       testID="workspace-header-track-agent"

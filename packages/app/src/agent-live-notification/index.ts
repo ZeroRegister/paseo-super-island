@@ -1,34 +1,25 @@
 import { PermissionsAndroid, Platform } from "react-native";
 import { create } from "zustand";
 import { getHostRuntimeStore, isHostRuntimeConnected } from "@/runtime/host-runtime";
-import { useSessionStore } from "@/stores/session-store";
-import { resolveAgentLivePhase, type AgentLivePhase } from "./model";
+import { useSessionStore, type Agent } from "@/stores/session-store";
+import { summarizeLiveAgents } from "./model";
 import { agentLiveNotification } from "./native";
 
-interface AgentTarget {
-  serverId: string;
-  agentId: string;
-}
-
-const useTracking = create<{ target: AgentTarget | null }>(() => ({ target: null }));
+const useTracking = create<{ enabled: boolean }>(() => ({ enabled: false }));
 let disposeTracking: (() => void) | null = null;
 let latestRequest = 0;
 
-function tracks(target: AgentTarget, current: AgentTarget | null): boolean {
-  return target.serverId === current?.serverId && target.agentId === current.agentId;
-}
-
 export const canTrackAgentLive = agentLiveNotification !== null;
 
-export function useIsAgentLiveTracked(target: AgentTarget): boolean {
-  return useTracking((state) => tracks(target, state.target));
+export function useIsAgentLiveTrackingEnabled(): boolean {
+  return useTracking((state) => state.enabled);
 }
 
 function stopTracking() {
   disposeTracking?.();
   disposeTracking = null;
   agentLiveNotification?.clear();
-  useTracking.setState({ target: null });
+  useTracking.setState({ enabled: false });
 }
 
 async function requestNotificationPermission(): Promise<boolean> {
@@ -38,57 +29,94 @@ async function requestNotificationPermission(): Promise<boolean> {
   return (await PermissionsAndroid.request(permission)) === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-type TrackingError = "inactive" | "permission";
-
-export async function toggleAgentLiveTracking(target: AgentTarget): Promise<TrackingError | null> {
+export async function toggleAgentLiveTracking(): Promise<"permission" | null> {
   const notification = agentLiveNotification;
   if (!notification) return null;
   const request = ++latestRequest;
-  if (tracks(target, useTracking.getState().target)) {
+  if (useTracking.getState().enabled) {
     stopTracking();
     return null;
   }
 
-  const { serverId, agentId } = target;
-  const host = getHostRuntimeStore();
-  const readPhase = () => {
-    const session = useSessionStore.getState().sessions[serverId];
-    return resolveAgentLivePhase(
-      session?.agents.get(agentId) ?? session?.agentDetails.get(agentId),
-      isHostRuntimeConnected(host.getSnapshot(serverId)),
-    );
-  };
-  const initialPhase = readPhase();
-  if (!initialPhase || initialPhase === "reconnecting") return "inactive";
   const allowed = await requestNotificationPermission();
   if (request !== latestRequest) return null;
   if (!allowed) return "permission";
 
-  const phaseAfterPermission = readPhase();
-  if (!phaseAfterPermission || phaseAfterPermission === "reconnecting") return "inactive";
-  if (!notification.publish(serverId, agentId, phaseAfterPermission)) return "permission";
+  const host = getHostRuntimeStore();
+  const releaseDirectories = new Map<string, () => void>();
+  let lastDirectories = new Map<string, ReadonlyMap<string, Agent>>();
+  let lastSummary: string | null = null;
+  let pending = false;
+  let disposed = false;
 
-  // The system replaces the previous notification under the same ID.
-  disposeTracking?.();
-  const releaseDirectory = host.acquireDirectoryDemand(serverId);
-  let lastPhase: AgentLivePhase = phaseAfterPermission;
   const refresh = () => {
-    const phase = readPhase();
-    if (phase === lastPhase) return;
-    if (!phase || !notification.publish(serverId, agentId, phase)) {
-      stopTracking();
-      return;
+    const hostIds = new Set(host.getHosts().map((entry) => entry.serverId));
+    for (const [serverId, release] of releaseDirectories) {
+      if (hostIds.has(serverId)) continue;
+      releaseDirectories.delete(serverId);
+      release();
     }
-    lastPhase = phase;
+    for (const serverId of hostIds) {
+      if (!releaseDirectories.has(serverId)) {
+        releaseDirectories.set(serverId, host.acquireDirectoryDemand(serverId));
+      }
+    }
+
+    const directories = new Map<string, ReadonlyMap<string, Agent>>();
+    const { sessions } = useSessionStore.getState();
+    for (const serverId of hostIds) {
+      const agents = sessions[serverId]?.agents;
+      if (agents && isHostRuntimeConnected(host.getSnapshot(serverId))) {
+        directories.set(serverId, agents);
+      }
+    }
+    if (
+      directories.size === lastDirectories.size &&
+      Array.from(directories).every(
+        ([serverId, agents]) => lastDirectories.get(serverId) === agents,
+      )
+    ) {
+      return true;
+    }
+
+    lastDirectories = directories;
+    const summary = summarizeLiveAgents(
+      Array.from(directories, ([serverId, agents]) => ({ serverId, agents: agents.values() })),
+    );
+    if (!summary) {
+      if (lastSummary !== null) notification.clear();
+      lastSummary = null;
+      return true;
+    }
+    const key = JSON.stringify(summary);
+    if (key === lastSummary) return true;
+    if (!notification.publish(summary.serverId, summary.agentId, summary.titles, summary.total)) {
+      stopTracking();
+      return false;
+    }
+    lastSummary = key;
+    return true;
   };
-  const unsubscribeSession = useSessionStore.subscribe(refresh);
-  const unsubscribeHost = host.subscribe(serverId, refresh);
+
+  // Host demand can synchronously update both stores. Reconcile once after each batch.
+  const scheduleRefresh = () => {
+    if (pending || disposed) return;
+    pending = true;
+    queueMicrotask(() => {
+      pending = false;
+      if (!disposed) refresh();
+    });
+  };
+  const unsubscribeSession = useSessionStore.subscribe(scheduleRefresh);
+  const unsubscribeHost = host.subscribeAll(scheduleRefresh);
+  const unsubscribeHostList = host.subscribeHostList(scheduleRefresh);
   disposeTracking = () => {
+    disposed = true;
     unsubscribeSession();
     unsubscribeHost();
-    releaseDirectory();
+    unsubscribeHostList();
+    for (const release of releaseDirectories.values()) release();
   };
-  useTracking.setState({ target });
-  refresh();
-  return null;
+  useTracking.setState({ enabled: true });
+  return refresh() ? null : "permission";
 }

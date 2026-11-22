@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import expo.modules.kotlin.modules.Module
@@ -32,9 +33,9 @@ class PaseoAgentLiveNotificationModule : Module() {
         ?.cancel(NOTIFICATION_ID)
     }
 
-    Function("publish") { serverId: String, agentId: String, phase: String ->
+    Function("publish") { serverId: String, agentId: String, titles: List<String>, total: Int ->
       val context = appContext.reactContext ?: return@Function false
-      publish(context, serverId, agentId, phase)
+      publish(context, serverId, agentId, titles, total)
     }
 
     Function("clear") {
@@ -69,8 +70,10 @@ class PaseoAgentLiveNotificationModule : Module() {
     context: Context,
     serverId: String,
     agentId: String,
-    phase: String,
+    titles: List<String>,
+    total: Int,
   ): Boolean {
+    if (titles.isEmpty() || total < titles.size) return false
     val manager = context.getSystemService(NotificationManager::class.java) ?: return false
     if (!manager.areNotificationsEnabled()) return false
 
@@ -95,27 +98,44 @@ class PaseoAgentLiveNotificationModule : Module() {
       launchIntent,
       PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
-    val (textResource, shortResource) = when (phase) {
-      "running" -> R.string.paseo_agent_live_running to R.string.paseo_agent_live_running_short
-      "waiting" -> R.string.paseo_agent_live_waiting to R.string.paseo_agent_live_waiting_short
-      "reconnecting" -> R.string.paseo_agent_live_reconnecting to R.string.paseo_agent_live_reconnecting_short
-      else -> return false
-    }
-    val text = context.getString(textResource)
-    val shortText = context.getString(shortResource)
+    val iconId = context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
+      .takeIf { it != 0 } ?: context.applicationInfo.icon
+    val headline = context.resources.getQuantityString(R.plurals.paseo_agent_live_count, total, total)
+    val shortText = if (total > 99) "99+" else total.toString()
+    val missingTitle = context.getString(R.string.paseo_agent_live_untitled)
+    val rows = titles.map { it.ifBlank { missingTitle } }
+    val overflow = total - rows.size
+    val body = buildList {
+      addAll(rows)
+      if (overflow > 0) add(context.getString(R.string.paseo_agent_live_overflow, overflow))
+    }.joinToString("\n")
+    val action = Notification.Action.Builder(
+      Icon.createWithResource(context, iconId),
+      context.getString(R.string.paseo_agent_live_open),
+      tap,
+    ).build()
     val extras = Bundle()
-    XiaomiIsland.addExtras(context, extras, text, shortText, tap)
+    XiaomiIsland.addExtras(context, extras, headline, body, shortText, action)
+
+    val publicSummary = Notification.Builder(context, CHANNEL_ID)
+      .setSmallIcon(iconId)
+      .setContentTitle(headline)
+      .setShowWhen(false)
+      .build()
 
     val builder = Notification.Builder(context, CHANNEL_ID)
-      .setSmallIcon(R.drawable.paseo_agent_live_notification)
-      .setContentTitle("Paseo")
-      .setContentText(text)
+      .setSmallIcon(iconId)
+      .setContentTitle(headline)
+      .setContentText(rows.first())
+      .setStyle(Notification.BigTextStyle().bigText(body))
       .setContentIntent(tap)
+      .addAction(action)
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setShowWhen(false)
       .setTimeoutAfter(60 * 60 * 1000L)
-      .setVisibility(Notification.VISIBILITY_PUBLIC)
+      .setVisibility(Notification.VISIBILITY_PRIVATE)
+      .setPublicVersion(publicSummary)
 
     if (Build.VERSION.SDK_INT >= 36) {
       builder.setShortCriticalText(shortText)
